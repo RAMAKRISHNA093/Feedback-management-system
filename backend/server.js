@@ -1,27 +1,28 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const mysql = require("mysql");
-require("dotenv").config();
-
-const reviewRoutes = require("./routes/reviews");
+const mysql = require("mysql2");
 
 const app = express();
-app.use(cors());
+
+// Enable CORS for frontend
+app.use(cors({
+  origin: "http://localhost:3000"
+}));
 app.use(express.json());
 
-// Create MySQL connection
+// MySQL connection
 const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "9392525988",
+  database: process.env.DB_NAME || "reviewdb",
 });
 
-// Connect to MySQL
 db.connect((err) => {
   if (err) {
     console.error("❌ Error connecting to MySQL:", err);
-    return;
+    process.exit(1);
   }
   console.log("✅ Connected to MySQL database!");
 });
@@ -29,24 +30,43 @@ db.connect((err) => {
 // Health check route
 app.get("/health", (req, res) => {
   db.query("SELECT 1", (err) => {
-    if (err) {
-      console.error("❌ DB not connected:", err);
-      return res.status(500).send("DB not connected");
-    }
+    if (err) return res.status(500).send("DB not connected");
     res.send("✅ DB Connected and Backend Running");
   });
 });
 
-// Attach db to req in middleware for reviews routes
-app.use("/api/reviews", (req, res, next) => {
-  req.db = db;
-  next();
-}, reviewRoutes);
+// ✅ Submit feedback (fixed column name)
+app.post("/api/reviews", (req, res) => {
+  const { name, email, message, rating } = req.body;
+  if (!name || !email || !message || !rating) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
 
-// Root route
-app.get("/", (req, res) => {
-  res.send("Backend is running...");
+  const sql = "INSERT INTO reviews (user_name, email, message, rating) VALUES (?, ?, ?, ?)";
+  db.query(sql, [name, email, message, rating], (err, result) => {
+    if (err) {
+      console.error("❌ Error inserting feedback:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+    res.json({ message: "Feedback submitted successfully!" });
+  });
 });
 
+// ✅ Fetch all feedback
+app.get("/api/reviews", (req, res) => {
+  const sql = "SELECT * FROM reviews ORDER BY id DESC";
+  db.query(sql, (err, results) => {
+    if (err) {
+      console.error("❌ Error fetching reviews:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+    res.json(results);
+  });
+});
+
+// Root
+app.get("/", (req, res) => res.send("Backend is running..."));
+
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

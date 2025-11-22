@@ -11,7 +11,7 @@ services:
     ports:
       - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql     # ✅ Persist MySQL data
 
   backend:
     build: ./backend
@@ -27,6 +27,8 @@ services:
       - mysql
     ports:
       - "5000:5000"
+    volumes:
+      - ./backend/logs:/app/logs      # ✅ Persist backend logs
 
   frontend:
     build: ./frontend
@@ -38,4 +40,4 @@ services:
       - backend
 
 volumes:
-  mysql_data:
+  mysql_data:                         # ✅ Declared named volume
